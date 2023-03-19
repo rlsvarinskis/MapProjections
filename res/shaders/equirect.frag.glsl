@@ -6,12 +6,14 @@ in vec2 UV;
 
 out vec3 color;
 
+uniform float zoom;
 uniform sampler2D texture_sampler;
 uniform mat3 rotation;
 
 void main() {
-    float x = (UV.x * 2 - 1.0f) * PI;
-    vec3 origin = vec3(sin(x) * sin(UV.y * PI), -cos(UV.y * PI), cos(x) * sin(UV.y * PI));
+    vec2 zoomed = (UV - vec2(0.5f, 0.5f)) / zoom + vec2(0.5f, 0.5f);
+    float x = (zoomed.x * 2 - 1.0f) * PI;
+    vec3 origin = vec3(sin(x) * sin(zoomed.y * PI), -cos(zoomed.y * PI), cos(x) * sin(zoomed.y * PI));
 
     vec3 dest = rotation * origin;
     vec2 uv = vec2(atan(dest.x, dest.z), -acos(dest.y)) / PI;

@@ -19,6 +19,9 @@ static bool rotate_active = false;
 static double drag_startx = 0;
 static double drag_starty = 0;
 static double rotate_startangle = 0;
+static double zoom = 1;
+
+static bool lock_north = false;
 
 static GLFWcursor *normal;
 static GLFWcursor *grab;
@@ -26,7 +29,7 @@ static GLFWcursor *grab;
 unsigned int current_texture = 9;
 Texture textures[9];
 
-void handle_mouse_button(GLFWwindow* window, int button, int action, int mods) {
+void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) { //Begin drag
             drag_active = true;
@@ -60,28 +63,10 @@ void handle_mouse_button(GLFWwindow* window, int button, int action, int mods) {
     }
 }
 
-static void rotate_by(float rx, float ry) {
-    float sx = std::sin(rx), cx = std::cos(rx);
-    float sy = std::sin(ry), cy = std::cos(ry);
-
-    //r(x) * r(y)
-    float rotxy[9] = {
-        cy, -sx * sy, cx * sy,
-        0, cx, sx,
-        -sy, -sx * cy, cx * cy
-    };
-    
-    float rot[9];
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            rot[i * 3 + j] = 0;
-            for (int k = 0; k < 3; k++) {
-                rot[i * 3 + j] += rotxy[i * 3 + k] * rot_mat[k * 3 + j];
-            }
-        }
-    }
-    for (int i = 0; i < 9; i++) {
-        rot_mat[i] = rot[i];
+void handle_scroll(GLFWwindow *window, double xscroll, double yscroll) {
+    zoom *= std::exp(yscroll / 5);
+    if (zoom < 1) {
+        zoom = 1;
     }
 }
 
@@ -108,7 +93,38 @@ static void rotate_roll(float roll) {
     }
 }
 
-void handle_cursor_position(GLFWwindow* window, double xpos, double ypos) {
+static void reset_roll() {
+    //North vector (0, 1, 0) will go the 2nd column of rot_mat^T
+    float roll = std::atan2(rot_mat[4], rot_mat[1]); //y / x
+    rotate_roll(roll - PI / 2);
+}
+
+static void rotate_by(float rx, float ry) {
+    float sx = std::sin(rx), cx = std::cos(rx);
+    float sy = std::sin(ry), cy = std::cos(ry);
+
+    //r(x) * r(y)
+    float rotxy[9] = {
+        cy, -sx * sy, cx * sy,
+        0, cx, sx,
+        -sy, -sx * cy, cx * cy
+    };
+    
+    float rot[9];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            rot[i * 3 + j] = 0;
+            for (int k = 0; k < 3; k++) {
+                rot[i * 3 + j] += rotxy[i * 3 + k] * rot_mat[k * 3 + j];
+            }
+        }
+    }
+    for (int i = 0; i < 9; i++) {
+        rot_mat[i] = rot[i];
+    }
+}
+
+void handle_cursor_position(GLFWwindow *window, double xpos, double ypos) {
     if (!drag_active && !rotate_active) {
         return;
     }
@@ -119,14 +135,14 @@ void handle_cursor_position(GLFWwindow* window, double xpos, double ypos) {
     ypos /= h;
 
     if (drag_active) {
-        float ox = (drag_starty * 2 - 1.0f) * PI;
-        float oy = (drag_startx * 2 - 1.0f) * PI;
+        float ox = (drag_starty * 2 - 1.0f) * PI / zoom;
+        float oy = (drag_startx * 2 - 1.0f) * PI / zoom;
 
         //rotate_by(/*-ox*/0, oy);
         rotate_by(0, -oy);
 
-        double dx = xpos - drag_startx;
-        double dy = ypos - drag_starty;
+        double dx = (xpos - drag_startx) / zoom;
+        double dy = (ypos - drag_starty) / zoom;
 
         float ry = dx * 2 * PI;
         float rx = dy * PI;
@@ -144,6 +160,9 @@ void handle_cursor_position(GLFWwindow* window, double xpos, double ypos) {
         double end_angle = std::atan2(ypos, xpos);
         rotate_roll(-(end_angle - rotate_startangle));
         rotate_startangle = end_angle;
+    }
+    if (lock_north) {
+        reset_roll();
     }
 }
 
@@ -167,21 +186,14 @@ static void set_texture(unsigned int id) {
     current_texture = id;
 }
 
-static void reset_roll() {
-    //North vector (0, 1, 0) will go the 2nd column of rot_mat
-    float roll = std::atan2(rot_mat[4], -rot_mat[3]); //y / x, -x to reverse the rotation
-
-    rotate_roll(- roll);
-}
-
-void handle_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
+void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
         if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
             set_texture(key - GLFW_KEY_1);
         } else if (key == GLFW_KEY_SPACE) { //Reset roll
             reset_roll();
         } else if (key == GLFW_KEY_X) { //Toggle locked/unlocked mode
-            //toggle locked/unlocked
+            lock_north = !lock_north;
         } else if (key == GLFW_KEY_ESCAPE) { //Close the window
             glfwSetWindowShouldClose(window, 1);
         }
@@ -222,6 +234,7 @@ int main(int argc, char** argv) {
     glfwSetKeyCallback(window, handle_key);
     glfwSetCursorPosCallback(window, handle_cursor_position);
     glfwSetMouseButtonCallback(window, handle_mouse_button);
+    glfwSetScrollCallback(window, handle_scroll);
 
     glfwMakeContextCurrent(window);
 
@@ -259,6 +272,7 @@ int main(int argc, char** argv) {
 
     GLuint texture_sampler_id; texture_sampler_id = glGetUniformLocation(equirect.program_id, "texture_sampler");
     GLuint rotation_id; rotation_id = glGetUniformLocation(equirect.program_id, "rotation");
+    GLuint zoom_id; zoom_id = glGetUniformLocation(equirect.program_id, "zoom");
 
     set_texture(1);
 
@@ -274,6 +288,7 @@ int main(int argc, char** argv) {
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, textures[current_texture].texture_id);
         glUniform1i(texture_sampler_id, 0);
+        glUniform1f(zoom_id, zoom);
         place_rotation(rotation_id);
         glEnableVertexAttribArray(0);
         glEnableVertexAttribArray(1);

@@ -1,5 +1,7 @@
 # Map projection experiment
 
+![A different projection of Earth](/screenshots/remapped.png?raw=true "A different projection of Earth")
+
 This program allows you to reproject any map onto new coordinates.
 
 Currently, it only supports the equirectangular projection.
@@ -21,7 +23,7 @@ When building, this program depends on libjpeg, libglew, libglfw3, and OpenGL.
 
 ## Building
 
-I am still figuring out the build system. 
+I am still figuring out the build system.
 
 libjpeg:
 ./configure --host='x86_64-w64-mingw32' CC='x86_64-w64-mingw32-gcc' --prefix='/usr/x86_64-w64-mingw32'

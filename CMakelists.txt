@@ -24,8 +24,8 @@ target_include_directories(MapProjection PRIVATE ./lib/glfw/include)
 target_include_directories(MapProjection PRIVATE "${OPENGL_INCLUDE_DIR}" "${JPEG_INCLUDE_DIRS}" "${GLEW_INCLUDE_DIRS}")
 
 find_library(GLFW_LIB glfw3dll PATHS ./lib/glfw/lib-mingw-w64/)
-find_library(GLEW_LIB glew32.dll PATHS ./)
-find_library(JPEG_LIB jpeg.dll PATHS ./)
+find_library(GLEW_LIB glew32.dll PATHS ./lib/)
+find_library(JPEG_LIB jpeg.dll PATHS ./lib/)
 
 # target_link_libraries(MapProjection ${GLFW_LIB} OpenGL::GL GLEW::glew JPEG::JPEG)
 target_link_libraries(MapProjection ${GLFW_LIB} opengl32 ${GLEW_LIB} ${JPEG_LIB})
