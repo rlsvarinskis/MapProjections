@@ -10,11 +10,11 @@ uniform sampler2D texture_sampler;
 uniform mat3 rotation;
 
 void main() {
-    float x = (UV.x * 2 - 1.5f) * PI;
-    vec3 origin = vec3(-sin(x) * sin(UV.y * PI), -cos(UV.y * PI), cos(x) * sin(UV.y * PI));
+    float x = (UV.x * 2 - 1.0f) * PI;
+    vec3 origin = vec3(sin(x) * sin(UV.y * PI), -cos(UV.y * PI), cos(x) * sin(UV.y * PI));
 
     vec3 dest = rotation * origin;
-    vec2 uv = vec2(atan(dest.z, dest.x), -acos(dest.y)) / PI;
+    vec2 uv = vec2(atan(dest.x, dest.z), -acos(dest.y)) / PI;
     uv.x = (uv.x + 1) / 2;
     uv -= floor(uv);
 

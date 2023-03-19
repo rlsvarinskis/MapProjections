@@ -6,7 +6,7 @@ Currently, it only supports the equirectangular projection.
 
 ## Controls
 
-Click and drag to move the map around.
+Click and drag to move the map around. Middle click to rotate around the center.
 
  - SPACE to reorient north up and south down.
  - X to toggle between locked north mode.

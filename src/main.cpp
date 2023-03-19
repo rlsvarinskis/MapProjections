@@ -12,16 +12,13 @@
 // Magic constant
 const float PI = 3.141592653589793238462;
 
-// Latitude
-static double ns = 0;
-// Longitude
-static double ew = 0;
-
-static double roll = 0;
+float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
 
 static bool drag_active = false;
+static bool rotate_active = false;
 static double drag_startx = 0;
 static double drag_starty = 0;
+static double rotate_startangle = 0;
 
 static GLFWcursor *normal;
 static GLFWcursor *grab;
@@ -43,24 +40,110 @@ void handle_mouse_button(GLFWwindow* window, int button, int action, int mods) {
             drag_active = false;
             glfwSetCursor(window, normal);
         }
+    } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+        if (action == GLFW_PRESS) { //Begin drag
+            rotate_active = true;
+            double x, y;
+            glfwGetCursorPos(window, &x, &y);
+            glfwSetCursor(window, grab);
+            int w, h;
+            glfwGetWindowSize(window, &w, &h);
+            x /= w;
+            y /= h;
+            x -= 0.5f;
+            y -= 0.5f;
+            rotate_startangle = std::atan2(y, x);
+        } else { //End drag
+            rotate_active = false;
+            glfwSetCursor(window, normal);
+        }
+    }
+}
+
+static void rotate_by(float rx, float ry) {
+    float sx = std::sin(rx), cx = std::cos(rx);
+    float sy = std::sin(ry), cy = std::cos(ry);
+
+    //r(x) * r(y)
+    float rotxy[9] = {
+        cy, -sx * sy, cx * sy,
+        0, cx, sx,
+        -sy, -sx * cy, cx * cy
+    };
+    
+    float rot[9];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            rot[i * 3 + j] = 0;
+            for (int k = 0; k < 3; k++) {
+                rot[i * 3 + j] += rotxy[i * 3 + k] * rot_mat[k * 3 + j];
+            }
+        }
+    }
+    for (int i = 0; i < 9; i++) {
+        rot_mat[i] = rot[i];
+    }
+}
+
+static void rotate_roll(float roll) {
+    float sz = std::sin(roll), cz = std::cos(roll);
+
+    float rotz[9] = {
+        cz, sz, 0,
+        -sz, cz, 0,
+        0, 0, 1
+    };
+    
+    float rot[9];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            rot[i * 3 + j] = 0;
+            for (int k = 0; k < 3; k++) {
+                rot[i * 3 + j] += rotz[i * 3 + k] * rot_mat[k * 3 + j];
+            }
+        }
+    }
+    for (int i = 0; i < 9; i++) {
+        rot_mat[i] = rot[i];
     }
 }
 
 void handle_cursor_position(GLFWwindow* window, double xpos, double ypos) {
+    if (!drag_active && !rotate_active) {
+        return;
+    }
+
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    xpos /= w;
+    ypos /= h;
+
     if (drag_active) {
-        int w, h;
-        glfwGetWindowSize(window, &w, &h);
-        xpos /= w;
-        ypos /= h;
+        float ox = (drag_starty * 2 - 1.0f) * PI;
+        float oy = (drag_startx * 2 - 1.0f) * PI;
+
+        //rotate_by(/*-ox*/0, oy);
+        rotate_by(0, -oy);
 
         double dx = xpos - drag_startx;
         double dy = ypos - drag_starty;
 
-        ew -= dx * 2;
-        ns -= dy;
+        float ry = dx * 2 * PI;
+        float rx = dy * PI;
+        rotate_by(rx, ry);
+
+        //rotate_by(ox, 0);
+        rotate_by(0, oy);
 
         drag_startx = xpos;
         drag_starty = ypos;
+    }
+    if (rotate_active) {
+        xpos -= 0.5f;
+        ypos -= 0.5f;
+        double end_angle = std::atan2(ypos, xpos);
+        rotate_roll(-(end_angle - rotate_startangle));
+        rotate_startangle = end_angle;
     }
 }
 
@@ -84,11 +167,19 @@ static void set_texture(unsigned int id) {
     current_texture = id;
 }
 
+static void reset_roll() {
+    //North vector (0, 1, 0) will go the 2nd column of rot_mat
+    float roll = std::atan2(rot_mat[4], -rot_mat[3]); //y / x, -x to reverse the rotation
+
+    rotate_roll(- roll);
+}
+
 void handle_key(GLFWwindow* window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
         if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
             set_texture(key - GLFW_KEY_1);
         } else if (key == GLFW_KEY_SPACE) { //Reset roll
+            reset_roll();
         } else if (key == GLFW_KEY_X) { //Toggle locked/unlocked mode
             //toggle locked/unlocked
         } else if (key == GLFW_KEY_ESCAPE) { //Close the window
@@ -98,37 +189,7 @@ void handle_key(GLFWwindow* window, int key, int scancode, int action, int mods)
 }
 
 static void place_rotation(GLuint rotation_id) {
-    float ry = ew * PI;
-    float rx = ns * PI;
-    float rz = roll * PI;
-
-    float sx = std::sin(rx), cx = std::cos(rx);
-    float sy = std::sin(ry), cy = std::cos(ry);
-    float sz = std::sin(rz), cz = std::cos(rz);
-
-    //r(z) * r(x) * r(y)
-    float rotxy[9] = {
-        cy, -sx * sy, cx * sy,
-        0, cx, sx,
-        -sy, -sx * cy, cx * cy
-    };
-    float rotz[9] = {
-        cz, sz, 0,
-        -sz, cz, 0,
-        0, 0, 1
-    };
-    
-    float rot[9];
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            rot[i * 3 + j] = 0;
-            for (int k = 0; k < 3; k++) {
-                rot[i * 3 + j] += rotxy[i * 3 + k] * rotz[k * 3 + j];
-            }
-        }
-    }
-
-    glUniformMatrix3fv(rotation_id, 1, GL_FALSE, rot);
+    glUniformMatrix3fv(rotation_id, 1, GL_FALSE, rot_mat);
 }
 
 int main(int argc, char** argv) {
@@ -203,7 +264,7 @@ int main(int argc, char** argv) {
 
     while (true) {
         static double last_time = glfwGetTime();
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT);
 
         int width, height;
         glfwGetFramebufferSize(window, &width, &height);
@@ -229,15 +290,17 @@ int main(int argc, char** argv) {
         static double last_checked = 0;
         static double worst_dt = 0;
         static int frames_since = 0;
+        static double sum_since_checked = 0;
         double nt = glfwGetTime();
         double dt = nt - last_time;
+        sum_since_checked += dt;
         last_time = nt;
         if (dt > worst_dt) {
             worst_dt = dt;
         }
         frames_since++;
         if (nt - 10 >= (long long) last_checked) {
-            std::cout << "Average time between " << frames_since << " frames: " << (nt - last_checked) / frames_since << ", FPS: " << (frames_since / (nt - last_checked)) << std::endl;
+            std::cout << "Average time between " << frames_since << " frames: " << sum_since_checked / frames_since << ", FPS: " << (frames_since / sum_since_checked) << std::endl;
             std::cout << "Worst time between frames: " << worst_dt << ", FPS: " << (1 / worst_dt) << std::endl;
             last_checked = nt;
             frames_since = 0;
