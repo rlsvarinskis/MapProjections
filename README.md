@@ -8,7 +8,7 @@ Currently, it only supports the equirectangular projection.
 
 ## Controls
 
-Click and drag to move the map around. Middle click to rotate around the center.
+Click and drag to move the map around. Scroll in to zoom in. Middle click to rotate around the center.
 
  - SPACE to reorient north up and south down.
  - X to toggle between locked north mode.
@@ -17,9 +17,9 @@ Click and drag to move the map around. Middle click to rotate around the center.
 
 ## Dependencies
 
-This program depends on OpenGL 3.3.
+This program depends on OpenGL 3.3. It needs glfw3.dll, glew32.dll, and libjpeg-9.dll, and the res/images and res/shaders folders to work.
 
-When building, this program depends on libjpeg, libglew, libglfw3, and OpenGL.
+When building, this program depends on libjpeg, libglew, libglfw3, and OpenGL. Right now, the program is only capable of loading .jpg files.
 
 ## Building
 

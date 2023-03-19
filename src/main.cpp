@@ -12,7 +12,16 @@
 // Magic constant
 const float PI = 3.141592653589793238462;
 
-float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+static float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+
+static float ns = 0;
+static float ew = 0;
+
+static float roll_animation_amount = 0;
+static float roll_animation_start = 0;
+static float last_roll_animation_time = 1.0f;
+static const float roll_animation_duration = 0.4f;
+static bool roll_animation_lock_north = false;
 
 static bool drag_active = false;
 static bool rotate_active = false;
@@ -28,6 +37,10 @@ static GLFWcursor *grab;
 
 unsigned int current_texture = 9;
 Texture textures[9];
+
+static float easeOutQuintic(float time) {
+    return 1 - std::pow(1 - time, 5);
+}
 
 void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
@@ -95,8 +108,37 @@ static void rotate_roll(float roll) {
 
 static void reset_roll() {
     //North vector (0, 1, 0) will go the 2nd column of rot_mat^T
-    float roll = std::atan2(rot_mat[4], rot_mat[1]); //y / x
-    rotate_roll(roll - PI / 2);
+    float roll = std::atan2(-rot_mat[1], rot_mat[4]); //-x / y, so that up is 0 degrees
+    roll_animation_amount = roll;
+    roll_animation_start = glfwGetTime();
+    last_roll_animation_time = 0;
+}
+
+static bool roll_animate(float time) {
+    if (last_roll_animation_time >= 1) {
+        return false;
+    }
+    float anim_time = (time - roll_animation_start) / roll_animation_duration;
+    if (anim_time >= 1) {
+        anim_time = 1;
+    }
+
+    float distance = easeOutQuintic(anim_time) - easeOutQuintic(last_roll_animation_time);
+    rotate_roll(roll_animation_amount * distance);
+
+    last_roll_animation_time = anim_time;
+
+    if (anim_time == 1) {
+        if (roll_animation_lock_north) {
+            roll_animation_lock_north = false;
+            lock_north = true;
+            //Calculate the angle that (0, 0, 1) goes to
+            ns = -std::asin(rot_mat[7]);
+            ew = -std::atan2(rot_mat[6], rot_mat[8]); //x / z
+        }
+        return false;
+    }
+    return true;
 }
 
 static void rotate_by(float rx, float ry) {
@@ -135,34 +177,42 @@ void handle_cursor_position(GLFWwindow *window, double xpos, double ypos) {
     ypos /= h;
 
     if (drag_active) {
-        float ox = (drag_starty * 2 - 1.0f) * PI / zoom;
-        float oy = (drag_startx * 2 - 1.0f) * PI / zoom;
+        if (lock_north) {
+            ew += (xpos - drag_startx) * 2 * PI / zoom;
+            ns += (ypos - drag_starty) * PI / zoom;
+            if (ns > PI / 2) {
+                ns = PI / 2;
+            } else if (ns < -PI / 2) {
+                ns = -PI / 2;
+            }
+            rot_mat[0] = 1; rot_mat[1] = 0; rot_mat[2] = 0;
+            rot_mat[3] = 0; rot_mat[4] = 1; rot_mat[5] = 0;
+            rot_mat[6] = 0; rot_mat[7] = 0; rot_mat[8] = 1;
+            rotate_by(0, ew);
+            rotate_by(ns, 0);
+        } else if (!roll_animation_lock_north) {
+            float ox = (drag_starty * 2 - 1.0f) * PI / zoom;
+            float oy = (drag_startx * 2 - 1.0f) * PI / zoom;
 
-        //rotate_by(/*-ox*/0, oy);
-        rotate_by(0, -oy);
+            rotate_by(0, -oy);
 
-        double dx = (xpos - drag_startx) / zoom;
-        double dy = (ypos - drag_starty) / zoom;
+            double dx = (xpos - drag_startx) / zoom;
+            double dy = (ypos - drag_starty) / zoom;
 
-        float ry = dx * 2 * PI;
-        float rx = dy * PI;
-        rotate_by(rx, ry);
+            rotate_by(dy * PI, dx * 2 * PI);
 
-        //rotate_by(ox, 0);
-        rotate_by(0, oy);
+            rotate_by(0, oy);
+        }
 
         drag_startx = xpos;
         drag_starty = ypos;
     }
-    if (rotate_active) {
+    if (rotate_active && !lock_north && !roll_animation_lock_north) {
         xpos -= 0.5f;
         ypos -= 0.5f;
         double end_angle = std::atan2(ypos, xpos);
         rotate_roll(-(end_angle - rotate_startangle));
         rotate_startangle = end_angle;
-    }
-    if (lock_north) {
-        reset_roll();
     }
 }
 
@@ -193,7 +243,12 @@ void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods)
         } else if (key == GLFW_KEY_SPACE) { //Reset roll
             reset_roll();
         } else if (key == GLFW_KEY_X) { //Toggle locked/unlocked mode
-            lock_north = !lock_north;
+            if (!lock_north) {
+                roll_animation_lock_north = true;
+                reset_roll();
+            } else {
+                lock_north = false;
+            }
         } else if (key == GLFW_KEY_ESCAPE) { //Close the window
             glfwSetWindowShouldClose(window, 1);
         }
@@ -327,7 +382,12 @@ int main(int argc, char** argv) {
             std::cerr << "Got error: " << last_error << std::endl;
         }
 
-        glfwWaitEvents();
+
+        if (roll_animate(nt)) {
+            glfwPollEvents();
+        } else {
+            glfwWaitEvents();
+        }
 
         if (glfwWindowShouldClose(window)) {
             break;

@@ -11,13 +11,13 @@ uniform sampler2D texture_sampler;
 uniform mat3 rotation;
 
 void main() {
-    vec2 zoomed = (UV - vec2(0.5f, 0.5f)) / zoom + vec2(0.5f, 0.5f);
-    float x = (zoomed.x * 2 - 1.0f) * PI;
-    vec3 origin = vec3(sin(x) * sin(zoomed.y * PI), -cos(zoomed.y * PI), cos(x) * sin(zoomed.y * PI));
+    vec2 zoomed = (UV - vec2(0.5f, 0.5f)) / zoom * PI;
+    zoomed.x *= 2;
+    vec3 origin = vec3(sin(zoomed.x) * cos(zoomed.y), sin(zoomed.y), cos(zoomed.x) * cos(zoomed.y));
 
     vec3 dest = rotation * origin;
-    vec2 uv = vec2(atan(dest.x, dest.z), -acos(dest.y)) / PI;
-    uv.x = (uv.x + 1) / 2;
+    vec2 uv = vec2(atan(dest.x, dest.z) / 2, asin(dest.y)) / PI;
+    uv += vec2(0.5f, 0.5f);
     uv -= floor(uv);
 
     color = texture(texture_sampler, uv).rgb;
