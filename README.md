@@ -26,10 +26,14 @@ When building, this program depends on libjpeg, libglew, libglfw3, and OpenGL. R
 I am still figuring out the build system.
 
 libjpeg:
+```
 ./configure --host='x86_64-w64-mingw32' CC='x86_64-w64-mingw32-gcc' --prefix='/usr/x86_64-w64-mingw32'
 make
 make install
+```
 
 libglew:
+```
 make SYSTEM=linux-mingw64 GLEW_DEST=/usr/x86_64-w64-mingw32
 make install SYSTEM=linux-mingw64 GLEW_DEST=/usr/x86_64-w64-mingw32
+```
