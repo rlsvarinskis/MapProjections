@@ -1,6 +1,10 @@
 #include <iostream>
 #include <cmath>
 
+#ifdef WIN32
+#include "Windows.h"
+#endif
+
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 #include "GL/glext.h"
@@ -259,7 +263,13 @@ static void place_rotation(GLuint rotation_id) {
     glUniformMatrix3fv(rotation_id, 1, GL_FALSE, rot_mat);
 }
 
-int main(int argc, char** argv) {
+
+#ifdef WIN32
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
+#else
+int main(int argc, char** argv)
+#endif
+{
     if (!glfwInit()) {
         std::cerr << "Failed to init GLFW!" << std::endl;
         const char* error_description = "";
@@ -322,6 +332,7 @@ int main(int argc, char** argv) {
 
     Shader equirect;
     if (!load_shader("equirect", equirect)) {
+        std::cerr << "Failed to load shader!" << std::endl;
         goto clean;
     }
 
@@ -398,4 +409,6 @@ clean:
     glfwDestroyWindow(window);
 
     glfwTerminate();
+
+    return 0;
 }

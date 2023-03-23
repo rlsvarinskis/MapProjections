@@ -14,6 +14,7 @@ static bool load_file(const std::string shadername, std::string &result) {
     std::string target = "res/shaders/" + shadername + ".glsl";
     std::ifstream file(target);
     if (file.fail()) {
+        std::cerr << "Failed to open " << target << std::endl;
         return false;
     }
 
