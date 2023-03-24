@@ -16,7 +16,7 @@ jobs:
 
     steps:
     - name: Install libraries
-      run: sudo apt-get update && sudo apt-get install libjpeg-dev libopengl-dev libglew-dev libglfw3-dev
+      run: sudo apt-get update && sudo apt-get install libjpeg-dev libpng-dev libopengl-dev libglew-dev libglfw3-dev
 
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -54,6 +54,7 @@ jobs:
           toolchain:p
           cmake:p
           libjpeg:p
+          libpng:p
           glew:p
           glfw:p
           ninja:p

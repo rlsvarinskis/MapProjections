@@ -301,6 +301,18 @@ int main(int argc, char** argv)
     glfwSetMouseButtonCallback(window, handle_mouse_button);
     glfwSetScrollCallback(window, handle_scroll);
 
+    {
+        Image window_icon;
+        load_image("./res/icon.png", window_icon);
+        GLFWimage images[1];
+        images[0].width = window_icon.width;
+        images[0].height = window_icon.height;
+        images[0].pixels = window_icon.data;
+        glfwSetWindowIcon(window, 1, images);
+        free_image(window_icon);
+    }
+
+
     glfwMakeContextCurrent(window);
 
     if (glewInit() != GLEW_OK) {
