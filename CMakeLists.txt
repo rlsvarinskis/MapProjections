@@ -11,11 +11,27 @@ find_package(JPEG REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 
-add_executable(MapProjection
-    src/main.cpp
-    src/shaders.cpp
-    src/images.cpp
-)
+if (WIN32)
+    add_custom_command(
+        OUTPUT icon.o
+        COMMAND windres icon.rc -o icon.o
+        COMMAND mv icon.o ${CMAKE_BINARY_DIR}/icon.o
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/icon
+    )
+    add_executable(MapProjection
+        src/main.cpp
+        src/shaders.cpp
+        src/images.cpp
+        ${CMAKE_BINARY_DIR}/icon.o
+    )
+else()
+    add_executable(MapProjection
+        src/main.cpp
+        src/shaders.cpp
+        src/images.cpp
+    )
+endif()
+
 
 target_include_directories(MapProjection PRIVATE "${OPENGL_INCLUDE_DIR}" "${JPEG_INCLUDE_DIRS}" "${GLEW_INCLUDE_DIRS}" "${GLFW_INCLUDE_DIRS}")
 
