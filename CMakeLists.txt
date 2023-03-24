@@ -11,6 +11,14 @@ find_package(JPEG REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(glfw3 REQUIRED)
 
+add_executable(MapProjection
+    src/main.cpp
+    src/shaders.cpp
+    src/images.cpp
+)
+
+target_include_directories(MapProjection PRIVATE "${OPENGL_INCLUDE_DIR}" "${JPEG_INCLUDE_DIRS}" "${GLEW_INCLUDE_DIRS}" "${GLFW_INCLUDE_DIRS}")
+
 if (WIN32)
     add_custom_command(
         OUTPUT icon.o
@@ -18,24 +26,7 @@ if (WIN32)
         COMMAND mv icon.o ${CMAKE_BINARY_DIR}/icon.o
         WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/src/icon
     )
-    add_executable(MapProjection
-        src/main.cpp
-        src/shaders.cpp
-        src/images.cpp
-        ${CMAKE_BINARY_DIR}/icon.o
-    )
-else()
-    add_executable(MapProjection
-        src/main.cpp
-        src/shaders.cpp
-        src/images.cpp
-    )
-endif()
-
-
-target_include_directories(MapProjection PRIVATE "${OPENGL_INCLUDE_DIR}" "${JPEG_INCLUDE_DIRS}" "${GLEW_INCLUDE_DIRS}" "${GLFW_INCLUDE_DIRS}")
-
-if (WIN32)
+    target_sources(MapProjection PRIVATE ${CMAKE_BINARY_DIR}/icon.o)
     add_compile_definitions(GLEW_STATIC)
 
     find_library(JPEG_LIB "libjpeg.a")
