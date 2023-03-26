@@ -10,7 +10,7 @@
 #include <GL/gl.h>
 #include <GL/glext.h>
 
-static bool load_file(const std::string shadername, std::string &result) {
+bool read_shader(const std::string shadername, std::string &result) {
     std::string target = "res/shaders/" + shadername + ".glsl";
     std::ifstream file(target);
     if (file.fail()) {
@@ -50,17 +50,11 @@ static bool compile_shader(const std::string &name, const std::string &code, GLu
     return result == GL_TRUE;
 }
 
-bool load_shader(const std::string &shadername, Shader &shader) {
-    std::string vertex_shader_code;
-    std::string fragment_shader_code;
-    if (!load_file(shadername + ".vert", vertex_shader_code) || !load_file(shadername + ".frag", fragment_shader_code)) {
-        return false;
-    }
-
+bool load_shader(const std::string &shadername, const std::string &vertex_shader_code, const std::string &fragment_shader_code, Shader &shader) {
     shader.vertex_id = glCreateShader(GL_VERTEX_SHADER);
     shader.fragment_id = glCreateShader(GL_FRAGMENT_SHADER);
 
-    if (!compile_shader(shadername + ".vert", vertex_shader_code, shader.vertex_id) || !compile_shader(shadername + ".frag", fragment_shader_code, shader.fragment_id)) {
+    if (!compile_shader(shadername + " (vertex shader)", vertex_shader_code, shader.vertex_id) || !compile_shader(shadername + " (fragment shader)", fragment_shader_code, shader.fragment_id)) {
         goto err;
     }
 
@@ -94,6 +88,16 @@ err:
     glDeleteShader(shader.vertex_id);
     glDeleteShader(shader.fragment_id);
     return false;
+}
+
+bool load_shader(const std::string &shadername, Shader &shader) {
+    std::string vertex_shader_code;
+    std::string fragment_shader_code;
+    if (!read_shader(shadername + ".vert", vertex_shader_code) || !read_shader(shadername + ".frag", fragment_shader_code)) {
+        return false;
+    }
+
+    return load_shader(shadername, vertex_shader_code, fragment_shader_code, shader);
 }
 
 void free_shader(Shader &shader) {

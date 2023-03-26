@@ -1,4 +1,6 @@
 #include <iostream>
+#include <map>
+#include <string>
 #include <cmath>
 
 #ifdef WIN32
@@ -10,12 +12,13 @@
 #include "GL/glext.h"
 #include "GL/gl.h"
 
+#include "projection.h"
+#include "mapper.h"
 #include "shaders.h"
 #include "images.h"
-#include "mapper.h"
-#include "projection.h"
+#include "maps.h"
 
-Projection *projection = /*&equirectangular*//*&mollweide*/&azimuthal;
+Projection *output_projection;
 
 static bool drag_active = false;
 static bool rotate_active = false;
@@ -26,9 +29,6 @@ static double zoom = 1;
 
 static GLFWcursor *normal;
 static GLFWcursor *grab;
-
-unsigned int current_texture = 9;
-Texture textures[9];
 
 /**
  * This function remaps window coordinates to the current projection's coordinates, with (-1, -1) to (1, 1) being the rectangle in which the projection is displayed.
@@ -42,35 +42,70 @@ static void remap_to_map_xy(double &x, double &y, int w, int h) {
     // If the window's height ratio is larger than than the projection's height ratio
     x = 2 * x - 1;
     y = 2 * y - 1;
-    if (h * projection->width > w * projection->height) {
+    if (h * output_projection->width > w * output_projection->height) {
         // Width is the limiting factor, therefore the real height is smaller than the window's height
-        y *= projection->width / (double) projection->height * h / (double) w;
+        y *= output_projection->width / (double) output_projection->height * h / (double) w;
     } else {
         // Width is the limiting factor, therefore the real width is smaller than the window's width
-        x *= projection->height / (double) projection->width * w / (double) h;
+        x *= output_projection->height / (double) output_projection->width * w / (double) h;
     }
+}
+
+void handle_drag_start(GLFWwindow *window) {
+    glfwGetCursorPos(window, &drag_startx, &drag_starty);
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    drag_startx /= w;
+    drag_starty /= h;
+    drag_starty = 1 - drag_starty;
+    remap_to_map_xy(drag_startx, drag_starty, w, h);
+    if (drag_startx <= -zoom || drag_startx >= zoom || drag_starty <= -zoom || drag_starty >= zoom || !output_projection->xy_to_uv(drag_startx / zoom, drag_starty / zoom, drag_startx, drag_starty)) {
+        return;
+    }
+    drag_active = true;
+    glfwSetCursor(window, grab);
+}
+
+void handle_drag(GLFWwindow *window, double xpos, double ypos) {
+    if (!drag_active) {
+        return;
+    }
+
+    int w, h;
+    glfwGetWindowSize(window, &w, &h);
+    xpos /= w;
+    ypos /= h;
+    ypos = 1 - ypos;
+    remap_to_map_xy(xpos, ypos, w, h);
+    
+    double dx, dy;
+    if (xpos <= -zoom || xpos >= zoom || ypos <= -zoom || ypos >= zoom || !output_projection->xy_to_uv(xpos / zoom, ypos / zoom, dx, dy)) {
+        return;
+    }
+    handle_rotation(drag_startx, drag_starty, dx, dy);
+
+    drag_startx = dx;
+    drag_starty = dy;
+}
+
+void handle_drag_stop(GLFWwindow *window) {
+    if (!drag_active) {
+        return;
+    }
+
+    drag_active = false;
+    glfwSetCursor(window, normal);
 }
 
 void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (action == GLFW_PRESS) { //Begin drag
-            glfwGetCursorPos(window, &drag_startx, &drag_starty);
-            int w, h;
-            glfwGetWindowSize(window, &w, &h);
-            drag_startx /= w;
-            drag_starty /= h;
-            remap_to_map_xy(drag_startx, drag_starty, w, h);
-            if (drag_startx < -1 || drag_startx > 1 || drag_starty < -1 || drag_starty > 1 || !projection->xy_to_uv(drag_startx / zoom, drag_starty / zoom, drag_startx, drag_starty)) {
-                return;
-            }
-            drag_active = true;
-            glfwSetCursor(window, grab);
-        } else if (drag_active) { //End drag
-            drag_active = false;
-            glfwSetCursor(window, normal);
+        if (action == GLFW_PRESS) {
+            handle_drag_start(window);
+        } else {
+            handle_drag_stop(window);
         }
     } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-        if (action == GLFW_PRESS) { //Begin drag
+        if (action == GLFW_PRESS) { //Begin rotate
             rotate_active = true;
             double x, y;
             glfwGetCursorPos(window, &x, &y);
@@ -79,10 +114,11 @@ void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
             glfwGetWindowSize(window, &w, &h);
             x /= w;
             y /= h;
+            y = 1 - y;
             remap_to_map_xy(x, y, w, h);
             
             rotate_startangle = std::atan2(y, x);
-        } else { //End drag
+        } else { //End rotate
             rotate_active = false;
             glfwSetCursor(window, normal);
         }
@@ -101,172 +137,241 @@ void handle_cursor_position(GLFWwindow *window, double xpos, double ypos) {
         return;
     }
 
-    int w, h;
-    glfwGetWindowSize(window, &w, &h);
-    xpos /= w;
-    ypos /= h;
-
     if (rotate_active && !is_locked()) {
-        double end_angle = std::atan2(ypos - 0.5f, xpos - 0.5f);
+        int w, h;
+        double x, y;
+        glfwGetWindowSize(window, &w, &h);
+        x = xpos / w;
+        y = ypos / h;
+        y = 1 - y;
+        double end_angle = std::atan2(y - 0.5f, x - 0.5f);
         rotate_roll(-(end_angle - rotate_startangle));
         rotate_startangle = end_angle;
     }
 
     if (drag_active) {
-        remap_to_map_xy(xpos, ypos, w, h);
-        double dx, dy;
-        if (!projection->xy_to_uv(xpos / zoom, ypos / zoom, dx, dy)) {
-            return;
-        }
-        handle_rotation(drag_startx, drag_starty, dx, dy);
-
-        drag_startx = dx;
-        drag_starty = dy;
+        handle_drag(window, xpos, ypos);
     }
 }
 
-struct SphereMap {
-    bool loaded;
-    std::string texture_name;
-    Texture texture;
+struct LoadedShader {
     Projection *source;
+    Projection *output;
+    unsigned int last_width;
+    unsigned int last_height;
+    Shader shader;
+
+    GLuint texture_sampler_id;
+    GLuint zoom_id;
+    GLuint scale_id;
+    GLuint rotation_matrix_id;
 };
 
-struct SphereMapPack {
-    SphereMap *maps;
-    int current_map;
-};
+std::map<std::string, unsigned int> projection_id;
+std::map<unsigned long long, LoadedShader> loaded_shaders;
+LoadedShader *current_shader;
 
-SphereMap earth[] = {
-    {
-        .loaded = false,
-        .texture_name = "earth1.jpg",
-        .source = &equirectangular
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth2.jpg",
-        .source = &equirectangular
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth3.jpg",
-        .source = &equirectangular
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth4.jpg",
-        .source = &equirectangular
-    },
-    /*{
-        .loaded = false,
-        .texture_name = "earth5.jpg",
-        .source = &azimuthal
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth6.jpg",
-        .source = &mollweide
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth7.jpg",
-        .source = &mollweide
-    },
-    {
-        .loaded = false,
-        .texture_name = "earth8.jpg",
-        .source = &robinson
-    }*/
-};
-SphereMap moon[] = {
-    {
-        .loaded = false,
-        .texture_name = "moon1.jpg",
-        .source = &equirectangular
-    }
-};
-SphereMap mars[] = {
-    {
-        .loaded = false,
-        .texture_name = "mars1.jpg",
-        .source = &equirectangular
-    },
-    {
-        .loaded = false,
-        .texture_name = "mars2.jpg",
-        .source = &equirectangular
-    }
-};
-SphereMap jupiter[] = {
-    {
-        .loaded = false,
-        .texture_name = "jupiter1.jpg",
-        .source = &equirectangular
-    }
-};
-SphereMap saturn[] = {
-    {
-        .loaded = false,
-        .texture_name = "saturn1.jpg",
-        .source = &equirectangular
-    }
-};
-SphereMap universe[] = {
-    /*{
-        .loaded = false,
-        .texture_name = "universe1.png",
-        .source = &mollweide
-    }*/
-};
+static unsigned int get_projection_id(Projection *projection) {
+    static int projection_count = 0;
 
-SphereMapPack maps[] = {
-    {earth, 0},
-    {moon, 0},
-    {mars, 0},
-    {jupiter, 0},
-    {saturn, 0},
-    // {universe, 0}
-};
-unsigned int current_map;
-
-static void set_texture(unsigned int id) {
-    static bool texture_loaded[9] = {false, false, false, false, false, false, false, false, false};
-    static const std::string texture_name[9] = {
-        "earth1.jpg",
-        "earth2.jpg",
-        "earth3.jpg",
-        "earth4.jpg",
-        "moon1.jpg",
-        "mars1.jpg",
-        "mars2.jpg",
-        "jupiter1.jpg",
-        "saturn1.jpg",
-    };
-
-    if (!texture_loaded[id]) {
-        texture_loaded[id] = load_texture(texture_name[id], textures[id]);
+    auto it = projection_id.find(projection->shader);
+    unsigned int id = -1;
+    if (it == projection_id.end()) {
+        id = projection_count++;
+        projection_id[projection->shader] = id;
+    } else {
+        id = it->second;
     }
-    current_texture = id;
+
+    return id;
+}
+
+static bool update_shader() {
+    SphereMap *current_map = get_current_map();
+    unsigned int source_id = get_projection_id(current_map->source);
+    unsigned int output_id = get_projection_id(output_projection);
+    unsigned long long shader_id = (((unsigned long long) source_id) << 32) | output_id;
+
+    LoadedShader *loaded_shader;
+    auto it = loaded_shaders.find(shader_id);
+    if (it == loaded_shaders.end()) {
+        LoadedShader temp;
+        loaded_shader = &temp;
+
+        temp.source = current_map->source;
+        temp.output = output_projection;
+        temp.last_width = 0;
+        temp.last_height = 0;
+
+        std::string vertex_shader;
+        std::string fragment_shader;
+        std::string buffer;
+
+        if (!read_shader("vertex", vertex_shader)) {
+            std::cerr << "Failed to load vertex shader!" << std::endl;
+            return false;
+        }
+
+        if (!read_shader("fragment", fragment_shader)) {
+            std::cerr << "Failed to load fragment shader!" << std::endl;
+            return false;
+        }
+
+        if (!read_shader(current_map->source->shader + ".ll_to_xy", buffer)) {
+            std::cerr << "Failed to read " << current_map->source->shader << " source mapping shader!" << std::endl;
+            return false;
+        }
+
+        fragment_shader += "\n" + buffer;
+        buffer.clear();
+
+        if (!read_shader(output_projection->shader + ".xy_to_ll", buffer)) {
+            std::cerr << "Failed to read " << output_projection->shader << " output mapping shader!" << std::endl;
+            return false;
+        }
+
+        fragment_shader += "\n" + buffer;
+
+        if (!load_shader(current_map->source->shader + " to " + output_projection->shader, vertex_shader, fragment_shader, temp.shader)) {
+            std::cerr << "Failed to compile generated " << current_map->source->shader << " to " << output_projection->shader << " shader!" << std::endl;
+            std::cerr << "Fragment shader dump:" << std::endl;
+            std::cerr << fragment_shader << std::endl;
+            return false;
+        }
+
+        std::cout << "Loaded shader " << current_map->source->shader + " to " + output_projection->shader << ", code:" << std::endl;
+        std::cout << fragment_shader << std::endl;
+
+        temp.texture_sampler_id = glGetUniformLocation(temp.shader.program_id, "texture_sampler");
+        temp.scale_id = glGetUniformLocation(temp.shader.program_id, "scale");
+        temp.rotation_matrix_id = glGetUniformLocation(temp.shader.program_id, "rotation");
+        temp.zoom_id = glGetUniformLocation(temp.shader.program_id, "zoom");
+
+        loaded_shader = &loaded_shaders[shader_id];
+        *loaded_shader = temp;
+    } else {
+        loaded_shader = &(it->second);
+    }
+
+    current_shader = loaded_shader;
+    return true;
+}
+
+static bool set_projection(Projection *projection) {
+    Projection *prev = output_projection;
+    output_projection = projection;
+    if (!update_shader()) {
+        std::cerr << "Failed to load shader for new output projection " << projection->shader << ", going back to " << prev->shader << std::endl;
+        output_projection = prev;
+        return false;
+    }
+    return true;
+}
+
+static void select_map(unsigned int id) {
+    if (!set_map(id)) {
+        std::cerr << "Failed to set map " << id << std::endl;
+        return;
+    }
+    if (update_shader()) {
+        return;
+    }
+    if (!set_map_pack(0)) {
+        std::cerr << "Failed to reset map pack to 0" << std::endl;
+    }
+    if (!set_map(0)) {
+        std::cerr << "Failed to reset map to 0" << std::endl;
+    }
+}
+
+static void select_pack(unsigned int id) {
+    if (!set_map_pack(id)) {
+        std::cerr << "Failed to set map pack " << id << std::endl;
+        return;
+    }
+    if (update_shader()) {
+        return;
+    }
+    if (!set_map_pack(0)) {
+        std::cerr << "Failed to reset map pack to 0" << std::endl;
+    }
 }
 
 void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods) {
     if (action == GLFW_PRESS) {
+        // 1-9 - set map
         if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
-            set_texture(key - GLFW_KEY_1);
-        } else if (key == GLFW_KEY_SPACE) { //Reset roll
+            select_map(key - GLFW_KEY_1);
+        }
+
+        // QWERTY - set map pack
+        else if (key == GLFW_KEY_Q) { select_pack(0); }
+        else if (key == GLFW_KEY_W) { select_pack(1); }
+        else if (key == GLFW_KEY_E) { select_pack(2); }
+        else if (key == GLFW_KEY_R) { select_pack(3); }
+        else if (key == GLFW_KEY_T) { select_pack(4); }
+        else if (key == GLFW_KEY_Y) { select_pack(5); }
+
+        // ASDF - set output projection
+        else if (key == GLFW_KEY_A) { set_projection(&equirectangular); }
+        else if (key == GLFW_KEY_S) { set_projection(&mollweide); }
+        else if (key == GLFW_KEY_D) { set_projection(&azimuthal); }
+        //else if (key == GLFW_KEY_F) { set_projection(&robinson); }
+
+        // Reset roll
+        else if (key == GLFW_KEY_SPACE) {
             reset_roll();
-        } else if (key == GLFW_KEY_X) { //Toggle locked/unlocked mode
+        }
+
+        // Toggle locked/unlocked mode
+        else if (key == GLFW_KEY_X) {
             toggle_lock();
-        } else if (key == GLFW_KEY_ESCAPE) { //Close the window
+        }
+        
+        // Close the window
+        else if (key == GLFW_KEY_ESCAPE) {
             glfwSetWindowShouldClose(window, 1);
         }
     }
 }
 
-static void place_rotation(GLuint rotation_id) {
-    glUniformMatrix3fv(rotation_id, 1, GL_FALSE, rot_mat);
+static double last_time;
+
+static void start_frame() {
+    last_time = glfwGetTime();
 }
+
+static void measure_fps() {
+    static double last_checked = 0;
+    static double worst_dt = 0;
+    static int frames_since = 0;
+    static double sum_since_checked = 0;
+    double nt = glfwGetTime();
+    double dt = nt - last_time;
+    //rotate_roll(-dt * 3.141592653589793238462);
+    sum_since_checked += dt;
+    last_time = nt;
+    if (dt > worst_dt) {
+        worst_dt = dt;
+    }
+    frames_since++;
+    if (nt - 10 >= (long long) last_checked) {
+        std::cout << "Average time between " << frames_since << " frames: " << sum_since_checked / frames_since << ", FPS: " << (frames_since / sum_since_checked) << std::endl;
+        std::cout << "Worst time between frames: " << worst_dt << ", FPS: " << (1 / worst_dt) << std::endl;
+        last_checked = nt;
+        frames_since = 0;
+        worst_dt = 0;
+    }
+}
+
+#define ERR(CODE)                                               \
+    CODE                                                        \
+    {GLenum last_error;                                         \
+    while ((last_error = glGetError()) != GL_NO_ERROR) {        \
+        std::cerr << "Executing line:" << std::endl;            \
+        std::cerr << #CODE << std::endl;                        \
+        std::cerr << "Got error: " << last_error << std::endl;  \
+    }}
 
 #ifdef WIN32
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -307,7 +412,10 @@ int main(int argc, char** argv)
 
     {
         Image window_icon;
-        load_image("./res/icon.png", window_icon);
+        if (!load_image("./res/icon.png", window_icon)) {
+            std::cerr << "Failed to load window icon!" << std::endl;
+            goto clean;
+        }
         GLFWimage images[1];
         images[0].width = window_icon.width;
         images[0].height = window_icon.height;
@@ -326,100 +434,58 @@ int main(int argc, char** argv)
     normal = glfwCreateStandardCursor(GLFW_CURSOR_NORMAL);
     grab = glfwCreateStandardCursor(GLFW_CROSSHAIR_CURSOR);
 
-    static const GLfloat main_square_vertices[] = {
-        -1.0f, -1.0f, 0.0f,  0.0f, 1.0f,
-        1.0f, -1.0f, 0.0f,   1.0f, 1.0f,
-        1.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-        
-        1.0f, 1.0f, 0.0f,    1.0f, 0.0f,
-        -1.0f, 1.0f, 0.0f,   0.0f, 0.0f,
-        -1.0f, -1.0f, 0.0f,  0.0f, 1.0f
-    };
+    prepare_rectangle();
 
-    GLuint main_square;
-    GLuint main_square_data;
-    glGenVertexArrays(1, &main_square);
-    glBindVertexArray(main_square);
-
-    glGenBuffers(1, &main_square_data);
-    glBindBuffer(GL_ARRAY_BUFFER, main_square_data);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(main_square_vertices), main_square_vertices, GL_STATIC_DRAW);
-
-    Shader equirect;
-    if (!load_shader(projection->shader, equirect)) {
-        std::cerr << "Failed to load shader!" << std::endl;
+    output_projection = &equirectangular;
+    if (!set_map_pack(0)) {
+        std::cerr << "Failed to load map pack 0!" << std::endl;
+        goto clean;
+    }
+    if (!update_shader()) {
+        std::cerr << "Failed to load default output projection shader " << output_projection->shader << "! Aborting!" << std::endl;
         goto clean;
     }
 
-    GLuint texture_sampler_id; texture_sampler_id = glGetUniformLocation(equirect.program_id, "texture_sampler");
-    GLuint rotation_id; rotation_id = glGetUniformLocation(equirect.program_id, "rotation");
-    GLuint zoom_id; zoom_id = glGetUniformLocation(equirect.program_id, "zoom");
-
-    set_texture(1);
-
     while (true) {
-        static double last_time = glfwGetTime();
+        start_frame();
+
         glClear(GL_COLOR_BUFFER_BIT);
 
-        int x = 0, y = 0, width, height;
+        int width, height;
         glfwGetFramebufferSize(window, &width, &height);
 
-        if (height * projection->width > width * projection->height) {
-            int nh = width * projection->height / projection->width;
-            y = (height - nh) / 2;
-            height = nh;
-        } else {
-            int nw = height * projection->width / projection->height;
-            x = (width - nw) / 2;
-            width = nw;
+        if (width != current_shader->last_width || height != current_shader->last_height) {
+            current_shader->last_width = width;
+            current_shader->last_height = height;
+            glViewport(0, 0, width, height);
+            float scale_x = 1;
+            float scale_y = 1;
+            if (height * output_projection->width > width * output_projection->height) {
+                scale_y = output_projection->height / output_projection->width * width / height;
+            } else {
+                scale_x = output_projection->width / output_projection->height * height / width;
+            }
+            ERR(glUseProgram(current_shader->shader.program_id);)
+            ERR(glUniform2f(current_shader->scale_id, scale_x, scale_y);)
         }
-        glViewport(x, y, width, height);
 
-        glUseProgram(equirect.program_id);
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, textures[current_texture].texture_id);
-        glUniform1i(texture_sampler_id, 0);
-        glUniform1f(zoom_id, zoom);
-        place_rotation(rotation_id);
-        glEnableVertexAttribArray(0);
-        glEnableVertexAttribArray(1);
-        glBindBuffer(GL_ARRAY_BUFFER, main_square_data);
-        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*) 0);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*) (3 * sizeof(GLfloat)));
-
-        glDrawArrays(GL_TRIANGLES, 0, 6);
-        glDisableVertexAttribArray(0);
-        glDisableVertexAttribArray(1);
+        ERR(glUseProgram(current_shader->shader.program_id);)
+        ERR(glActiveTexture(GL_TEXTURE0);)
+        ERR(glBindTexture(GL_TEXTURE_2D, get_current_map()->texture.texture_id);)
+        ERR(glUniform1i(current_shader->texture_sampler_id, 0);)
+        ERR(glUniform1f(current_shader->zoom_id, zoom);)
+        ERR(render_rectangle(current_shader->rotation_matrix_id);)
 
         glfwSwapBuffers(window);
 
-        static double last_checked = 0;
-        static double worst_dt = 0;
-        static int frames_since = 0;
-        static double sum_since_checked = 0;
-        double nt = glfwGetTime();
-        double dt = nt - last_time;
-        sum_since_checked += dt;
-        last_time = nt;
-        if (dt > worst_dt) {
-            worst_dt = dt;
-        }
-        frames_since++;
-        if (nt - 10 >= (long long) last_checked) {
-            std::cout << "Average time between " << frames_since << " frames: " << sum_since_checked / frames_since << ", FPS: " << (frames_since / sum_since_checked) << std::endl;
-            std::cout << "Worst time between frames: " << worst_dt << ", FPS: " << (1 / worst_dt) << std::endl;
-            last_checked = nt;
-            frames_since = 0;
-            worst_dt = 0;
-        }
+        measure_fps();
 
         GLenum last_error;
         while ((last_error = glGetError()) != GL_NO_ERROR) {
             std::cerr << "Got error: " << last_error << std::endl;
         }
 
-
-        if (animate_roll(nt)) {
+        if (animate_roll(glfwGetTime())) {
             glfwPollEvents();
         } else {
             glfwWaitEvents();

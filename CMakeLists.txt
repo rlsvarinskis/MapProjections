@@ -20,6 +20,7 @@ add_executable(MapProjection
     src/images.cpp
     src/projection.cpp
     src/mapper.cpp
+    src/maps.cpp
 )
 
 target_include_directories(MapProjection

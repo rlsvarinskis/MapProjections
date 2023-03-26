@@ -4,23 +4,24 @@
 
 This program allows you to reproject any map projection onto new coordinates.
 
-Currently, it only supports the equirectangular projection.
+Different projections work, but reversing the Mollweide projection (i.e. loading it from an image) is apparently a [much harder problem](https://en.wikipedia.org/wiki/Kepler%27s_equation#Inverse_problem) than I thought at first.
 
 ### TODO:
 
-- Mollweide projection
-- Azimuthal equidistant projection
+- Allow precomputing a texture to help reversing projections
+- Mollweide projection in source image
 - Robinson projection
-- Ability load one projection and render it as another
 - WebGL version
 
 ## Controls
 
 Click and drag to move the map around. Scroll in to zoom in. Middle click to rotate around the center.
 
+ - `ASD` to select between using the equirectangular, Mollweide, or Azimuthal equidistant projections.
+ - `1-9` to change between one of the 9 default maps.
+ - `QWERTY` to select between images of Earth, the Moon, Mars, Jupiter, or Saturn.
  - `SPACE` to reorient north up and south down.
  - `X` to toggle between locked north mode.
- - `1-9` to change between one of the 9 default maps.
  - `ESC` to exit.
 
 ## Dependencies

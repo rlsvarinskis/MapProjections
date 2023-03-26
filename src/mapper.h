@@ -1,8 +1,5 @@
-/**
- * The rotation matrix for the sphere.
- * Keep this linear transformation a rotation only, or else all of the code will get messed up.
- */
-extern float rot_mat[9];
+#ifndef MAPPER_H
+#define MAPPER_H
 
 void rotate_roll(float roll);
 
@@ -19,3 +16,8 @@ bool animate_roll(float time);
 void toggle_lock();
 bool is_locked();
 void handle_rotation(double sx, double sy, double ex, double ey);
+
+void prepare_rectangle();
+void render_rectangle(GLuint rotation_matrix_id);
+
+#endif

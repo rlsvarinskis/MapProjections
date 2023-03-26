@@ -10,7 +10,7 @@ const float PI = 3.141592653589793238462;
  * The rotation matrix for the sphere.
  * Keep this linear transformation a rotation only, or else all of the code will get messed up.
  */
-float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
+static float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
 
 void rotate_roll(float roll) {
     float sz = std::sin(roll), cz = std::cos(roll);
@@ -36,8 +36,8 @@ void rotate_roll(float roll) {
 }
 
 static void rotate_by(float rx, float ry) {
-    float sx = std::sin(rx), cx = std::cos(rx);
-    float sy = std::sin(ry), cy = std::cos(ry);
+    float sx = std::sin(-rx), cx = std::cos(-rx);
+    float sy = std::sin(-ry), cy = std::cos(-ry);
 
     //r(x) * r(y)
     float rotxy[9] = {
@@ -114,8 +114,8 @@ bool animate_roll(float time) {
             roll_animation_lock_north = false;
             lock_north = true;
             //Calculate the angle that (0, 0, 1) goes to
-            ns = -std::asin(rot_mat[7]);
-            ew = -std::atan2(rot_mat[6], rot_mat[8]); //x / z
+            ns = std::asin(rot_mat[7]);
+            ew = std::atan2(rot_mat[6], rot_mat[8]); //x / z
         }
     }
     return true;
@@ -153,4 +153,40 @@ void handle_rotation(double sx, double sy, double ex, double ey) {
         rotate_by(ey - sy, ex - sx);
         rotate_by(0, sx);
     }
+}
+
+static GLuint main_square;
+static GLuint main_square_data;
+
+void prepare_rectangle() {
+    static const GLfloat main_square_vertices[] = {
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f,
+        1.0f, -1.0f, 0.0f,   1.0f, 0.0f,
+        1.0f, 1.0f, 0.0f,    1.0f, 1.0f,
+        
+        1.0f, 1.0f, 0.0f,    1.0f, 1.0f,
+        -1.0f, 1.0f, 0.0f,   0.0f, 1.0f,
+        -1.0f, -1.0f, 0.0f,  0.0f, 0.0f
+    };
+
+    glGenVertexArrays(1, &main_square);
+    glBindVertexArray(main_square);
+
+    glGenBuffers(1, &main_square_data);
+    glBindBuffer(GL_ARRAY_BUFFER, main_square_data);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(main_square_vertices), main_square_vertices, GL_STATIC_DRAW);
+}
+
+void render_rectangle(GLuint rotation_matrix_id) {
+    glUniformMatrix3fv(rotation_matrix_id, 1, GL_FALSE, rot_mat);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glBindBuffer(GL_ARRAY_BUFFER, main_square_data);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*) 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(GLfloat), (void*) (3 * sizeof(GLfloat)));
+
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glDisableVertexAttribArray(0);
+    glDisableVertexAttribArray(1);
 }

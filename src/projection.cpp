@@ -55,8 +55,8 @@ bool azimuthal_xy_to_uv(const double x, const double y, double &u, double &v) {
     if (x * x + y * y >= 1) {
         return false;
     }
-    v = -PI / 2 + std::sqrt(x * x + y * y) * PI;
-    u = std::atan2(x, y);
+    v = PI / 2 - std::sqrt(x * x + y * y) * PI;
+    u = std::atan2(x, -y);
     return !std::isnan(u) && !std::isnan(v);
 }
 

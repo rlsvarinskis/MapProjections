@@ -1,3 +1,6 @@
+#ifndef IMAGES_H
+#define IMAGES_H
+
 #include <string>
 
 #include <GL/glew.h>
@@ -18,3 +21,5 @@ void free_image(struct Image &image);
 
 bool load_texture(const std::string &name, struct Texture &texture);
 void free_texture(struct Texture &texture);
+
+#endif
