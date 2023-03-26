@@ -95,3 +95,9 @@ err:
     glDeleteShader(shader.fragment_id);
     return false;
 }
+
+void free_shader(Shader &shader) {
+    glDeleteProgram(shader.program_id);
+    glDeleteShader(shader.vertex_id);
+    glDeleteShader(shader.fragment_id);
+}

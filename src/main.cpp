@@ -12,20 +12,10 @@
 
 #include "shaders.h"
 #include "images.h"
+#include "mapper.h"
+#include "projection.h"
 
-// Magic constant
-const float PI = 3.141592653589793238462;
-
-static float rot_mat[9] = {1, 0, 0, 0, 1, 0, 0, 0, 1};
-
-static float ns = 0;
-static float ew = 0;
-
-static float roll_animation_amount = 0;
-static float roll_animation_start = 0;
-static float last_roll_animation_time = 1.0f;
-static const float roll_animation_duration = 0.4f;
-static bool roll_animation_lock_north = false;
+Projection *projection = /*&equirectangular*//*&mollweide*/&azimuthal;
 
 static bool drag_active = false;
 static bool rotate_active = false;
@@ -34,29 +24,48 @@ static double drag_starty = 0;
 static double rotate_startangle = 0;
 static double zoom = 1;
 
-static bool lock_north = false;
-
 static GLFWcursor *normal;
 static GLFWcursor *grab;
 
 unsigned int current_texture = 9;
 Texture textures[9];
 
-static float easeOutQuintic(float time) {
-    return 1 - std::pow(1 - time, 5);
+/**
+ * This function remaps window coordinates to the current projection's coordinates, with (-1, -1) to (1, 1) being the rectangle in which the projection is displayed.
+ * 
+ * @param x x coordinate to remap
+ * @param y y coordinate to remap
+ * @param w window width
+ * @param h window height
+*/
+static void remap_to_map_xy(double &x, double &y, int w, int h) {
+    // If the window's height ratio is larger than than the projection's height ratio
+    x = 2 * x - 1;
+    y = 2 * y - 1;
+    if (h * projection->width > w * projection->height) {
+        // Width is the limiting factor, therefore the real height is smaller than the window's height
+        y *= projection->width / (double) projection->height * h / (double) w;
+    } else {
+        // Width is the limiting factor, therefore the real width is smaller than the window's width
+        x *= projection->height / (double) projection->width * w / (double) h;
+    }
 }
 
 void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
     if (button == GLFW_MOUSE_BUTTON_LEFT) {
         if (action == GLFW_PRESS) { //Begin drag
-            drag_active = true;
             glfwGetCursorPos(window, &drag_startx, &drag_starty);
-            glfwSetCursor(window, grab);
             int w, h;
             glfwGetWindowSize(window, &w, &h);
             drag_startx /= w;
             drag_starty /= h;
-        } else { //End drag
+            remap_to_map_xy(drag_startx, drag_starty, w, h);
+            if (drag_startx < -1 || drag_startx > 1 || drag_starty < -1 || drag_starty > 1 || !projection->xy_to_uv(drag_startx / zoom, drag_starty / zoom, drag_startx, drag_starty)) {
+                return;
+            }
+            drag_active = true;
+            glfwSetCursor(window, grab);
+        } else if (drag_active) { //End drag
             drag_active = false;
             glfwSetCursor(window, normal);
         }
@@ -70,8 +79,8 @@ void handle_mouse_button(GLFWwindow *window, int button, int action, int mods) {
             glfwGetWindowSize(window, &w, &h);
             x /= w;
             y /= h;
-            x -= 0.5f;
-            y -= 0.5f;
+            remap_to_map_xy(x, y, w, h);
+            
             rotate_startangle = std::atan2(y, x);
         } else { //End drag
             rotate_active = false;
@@ -87,89 +96,6 @@ void handle_scroll(GLFWwindow *window, double xscroll, double yscroll) {
     }
 }
 
-static void rotate_roll(float roll) {
-    float sz = std::sin(roll), cz = std::cos(roll);
-
-    float rotz[9] = {
-        cz, sz, 0,
-        -sz, cz, 0,
-        0, 0, 1
-    };
-    
-    float rot[9];
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            rot[i * 3 + j] = 0;
-            for (int k = 0; k < 3; k++) {
-                rot[i * 3 + j] += rotz[i * 3 + k] * rot_mat[k * 3 + j];
-            }
-        }
-    }
-    for (int i = 0; i < 9; i++) {
-        rot_mat[i] = rot[i];
-    }
-}
-
-static void reset_roll() {
-    //North vector (0, 1, 0) will go the 2nd column of rot_mat^T
-    float roll = std::atan2(-rot_mat[1], rot_mat[4]); //-x / y, so that up is 0 degrees
-    roll_animation_amount = roll;
-    roll_animation_start = glfwGetTime();
-    last_roll_animation_time = 0;
-}
-
-static bool roll_animate(float time) {
-    if (last_roll_animation_time >= 1) {
-        return false;
-    }
-    float anim_time = (time - roll_animation_start) / roll_animation_duration;
-    if (anim_time >= 1) {
-        anim_time = 1;
-    }
-
-    float distance = easeOutQuintic(anim_time) - easeOutQuintic(last_roll_animation_time);
-    rotate_roll(roll_animation_amount * distance);
-
-    last_roll_animation_time = anim_time;
-
-    if (anim_time == 1) {
-        if (roll_animation_lock_north) {
-            roll_animation_lock_north = false;
-            lock_north = true;
-            //Calculate the angle that (0, 0, 1) goes to
-            ns = -std::asin(rot_mat[7]);
-            ew = -std::atan2(rot_mat[6], rot_mat[8]); //x / z
-        }
-        return false;
-    }
-    return true;
-}
-
-static void rotate_by(float rx, float ry) {
-    float sx = std::sin(rx), cx = std::cos(rx);
-    float sy = std::sin(ry), cy = std::cos(ry);
-
-    //r(x) * r(y)
-    float rotxy[9] = {
-        cy, -sx * sy, cx * sy,
-        0, cx, sx,
-        -sy, -sx * cy, cx * cy
-    };
-    
-    float rot[9];
-    for (int i = 0; i < 3; i++) {
-        for (int j = 0; j < 3; j++) {
-            rot[i * 3 + j] = 0;
-            for (int k = 0; k < 3; k++) {
-                rot[i * 3 + j] += rotxy[i * 3 + k] * rot_mat[k * 3 + j];
-            }
-        }
-    }
-    for (int i = 0; i < 9; i++) {
-        rot_mat[i] = rot[i];
-    }
-}
-
 void handle_cursor_position(GLFWwindow *window, double xpos, double ypos) {
     if (!drag_active && !rotate_active) {
         return;
@@ -180,45 +106,129 @@ void handle_cursor_position(GLFWwindow *window, double xpos, double ypos) {
     xpos /= w;
     ypos /= h;
 
-    if (drag_active) {
-        if (lock_north) {
-            ew += (xpos - drag_startx) * 2 * PI / zoom;
-            ns += (ypos - drag_starty) * PI / zoom;
-            if (ns > PI / 2) {
-                ns = PI / 2;
-            } else if (ns < -PI / 2) {
-                ns = -PI / 2;
-            }
-            rot_mat[0] = 1; rot_mat[1] = 0; rot_mat[2] = 0;
-            rot_mat[3] = 0; rot_mat[4] = 1; rot_mat[5] = 0;
-            rot_mat[6] = 0; rot_mat[7] = 0; rot_mat[8] = 1;
-            rotate_by(0, ew);
-            rotate_by(ns, 0);
-        } else if (!roll_animation_lock_north) {
-            float ox = (drag_starty * 2 - 1.0f) * PI / zoom;
-            float oy = (drag_startx * 2 - 1.0f) * PI / zoom;
-
-            rotate_by(0, -oy);
-
-            double dx = (xpos - drag_startx) / zoom;
-            double dy = (ypos - drag_starty) / zoom;
-
-            rotate_by(dy * PI, dx * 2 * PI);
-
-            rotate_by(0, oy);
-        }
-
-        drag_startx = xpos;
-        drag_starty = ypos;
-    }
-    if (rotate_active && !lock_north && !roll_animation_lock_north) {
-        xpos -= 0.5f;
-        ypos -= 0.5f;
-        double end_angle = std::atan2(ypos, xpos);
+    if (rotate_active && !is_locked()) {
+        double end_angle = std::atan2(ypos - 0.5f, xpos - 0.5f);
         rotate_roll(-(end_angle - rotate_startangle));
         rotate_startangle = end_angle;
     }
+
+    if (drag_active) {
+        remap_to_map_xy(xpos, ypos, w, h);
+        double dx, dy;
+        if (!projection->xy_to_uv(xpos / zoom, ypos / zoom, dx, dy)) {
+            return;
+        }
+        handle_rotation(drag_startx, drag_starty, dx, dy);
+
+        drag_startx = dx;
+        drag_starty = dy;
+    }
 }
+
+struct SphereMap {
+    bool loaded;
+    std::string texture_name;
+    Texture texture;
+    Projection *source;
+};
+
+struct SphereMapPack {
+    SphereMap *maps;
+    int current_map;
+};
+
+SphereMap earth[] = {
+    {
+        .loaded = false,
+        .texture_name = "earth1.jpg",
+        .source = &equirectangular
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth2.jpg",
+        .source = &equirectangular
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth3.jpg",
+        .source = &equirectangular
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth4.jpg",
+        .source = &equirectangular
+    },
+    /*{
+        .loaded = false,
+        .texture_name = "earth5.jpg",
+        .source = &azimuthal
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth6.jpg",
+        .source = &mollweide
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth7.jpg",
+        .source = &mollweide
+    },
+    {
+        .loaded = false,
+        .texture_name = "earth8.jpg",
+        .source = &robinson
+    }*/
+};
+SphereMap moon[] = {
+    {
+        .loaded = false,
+        .texture_name = "moon1.jpg",
+        .source = &equirectangular
+    }
+};
+SphereMap mars[] = {
+    {
+        .loaded = false,
+        .texture_name = "mars1.jpg",
+        .source = &equirectangular
+    },
+    {
+        .loaded = false,
+        .texture_name = "mars2.jpg",
+        .source = &equirectangular
+    }
+};
+SphereMap jupiter[] = {
+    {
+        .loaded = false,
+        .texture_name = "jupiter1.jpg",
+        .source = &equirectangular
+    }
+};
+SphereMap saturn[] = {
+    {
+        .loaded = false,
+        .texture_name = "saturn1.jpg",
+        .source = &equirectangular
+    }
+};
+SphereMap universe[] = {
+    /*{
+        .loaded = false,
+        .texture_name = "universe1.png",
+        .source = &mollweide
+    }*/
+};
+
+SphereMapPack maps[] = {
+    {earth, 0},
+    {moon, 0},
+    {mars, 0},
+    {jupiter, 0},
+    {saturn, 0},
+    // {universe, 0}
+};
+unsigned int current_map;
 
 static void set_texture(unsigned int id) {
     static bool texture_loaded[9] = {false, false, false, false, false, false, false, false, false};
@@ -247,12 +257,7 @@ void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods)
         } else if (key == GLFW_KEY_SPACE) { //Reset roll
             reset_roll();
         } else if (key == GLFW_KEY_X) { //Toggle locked/unlocked mode
-            if (!lock_north) {
-                roll_animation_lock_north = true;
-                reset_roll();
-            } else {
-                lock_north = false;
-            }
+            toggle_lock();
         } else if (key == GLFW_KEY_ESCAPE) { //Close the window
             glfwSetWindowShouldClose(window, 1);
         }
@@ -262,7 +267,6 @@ void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods)
 static void place_rotation(GLuint rotation_id) {
     glUniformMatrix3fv(rotation_id, 1, GL_FALSE, rot_mat);
 }
-
 
 #ifdef WIN32
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PSTR lpCmdLine, int nCmdShow)
@@ -312,7 +316,6 @@ int main(int argc, char** argv)
         free_image(window_icon);
     }
 
-
     glfwMakeContextCurrent(window);
 
     if (glewInit() != GLEW_OK) {
@@ -343,7 +346,7 @@ int main(int argc, char** argv)
     glBufferData(GL_ARRAY_BUFFER, sizeof(main_square_vertices), main_square_vertices, GL_STATIC_DRAW);
 
     Shader equirect;
-    if (!load_shader("equirect", equirect)) {
+    if (!load_shader(projection->shader, equirect)) {
         std::cerr << "Failed to load shader!" << std::endl;
         goto clean;
     }
@@ -358,9 +361,19 @@ int main(int argc, char** argv)
         static double last_time = glfwGetTime();
         glClear(GL_COLOR_BUFFER_BIT);
 
-        int width, height;
+        int x = 0, y = 0, width, height;
         glfwGetFramebufferSize(window, &width, &height);
-        glViewport(0, 0, width, height);
+
+        if (height * projection->width > width * projection->height) {
+            int nh = width * projection->height / projection->width;
+            y = (height - nh) / 2;
+            height = nh;
+        } else {
+            int nw = height * projection->width / projection->height;
+            x = (width - nw) / 2;
+            width = nw;
+        }
+        glViewport(x, y, width, height);
 
         glUseProgram(equirect.program_id);
         glActiveTexture(GL_TEXTURE0);
@@ -406,7 +419,7 @@ int main(int argc, char** argv)
         }
 
 
-        if (roll_animate(nt)) {
+        if (animate_roll(nt)) {
             glfwPollEvents();
         } else {
             glfwWaitEvents();

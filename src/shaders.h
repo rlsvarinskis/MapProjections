@@ -11,3 +11,4 @@ struct Shader {
 };
 
 bool load_shader(const std::string &shadername, Shader &shader);
+void free_shader(Shader &shader);
