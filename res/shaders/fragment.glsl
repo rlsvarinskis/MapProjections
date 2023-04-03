@@ -10,6 +10,7 @@ uniform vec2 scale;
 uniform float zoom;
 uniform sampler2D texture_sampler;
 uniform mat3 rotation;
+uniform bool infinite_mode;
 
 bool xy_to_ll(inout vec2 zoomed);
 void ll_to_xy(inout vec2 uv);
@@ -22,7 +23,9 @@ bool is_outside(vec2 uv, vec2 a, vec2 b) {
 void main() {
     vec2 zoomed = (UV * 2 - vec2(1, 1)) / scale / zoom;
 
-    if (is_outside(zoomed, vec2(-1, -1), vec2(1, 1)) || !xy_to_ll(zoomed)) {
+    if (infinite_mode) {
+        xy_to_ll(zoomed);
+    } else if (is_outside(zoomed, vec2(-1, -1), vec2(1, 1)) || !xy_to_ll(zoomed)) {
         color = vec3(0, 0, 0);
         return;
     }

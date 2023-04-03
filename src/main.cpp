@@ -13,6 +13,7 @@
 #include "GL/gl.h"
 
 #include "projection.h"
+#include "projections/mollweide.h"
 #include "mapper.h"
 #include "shaders.h"
 #include "images.h"
@@ -26,6 +27,8 @@ static double drag_startx = 0;
 static double drag_starty = 0;
 static double rotate_startangle = 0;
 static double zoom = 1;
+
+static bool infinite_mode = false;
 
 static GLFWcursor *normal;
 static GLFWcursor *grab;
@@ -165,6 +168,7 @@ struct LoadedShader {
     GLuint zoom_id;
     GLuint scale_id;
     GLuint rotation_matrix_id;
+    GLuint infinite_mode_id;
 };
 
 std::map<std::string, unsigned int> projection_id;
@@ -239,13 +243,14 @@ static bool update_shader() {
             return false;
         }
 
-        std::cout << "Loaded shader " << current_map->source->shader + " to " + output_projection->shader << ", code:" << std::endl;
-        std::cout << fragment_shader << std::endl;
+        //std::cout << "Loaded shader " << current_map->source->shader + " to " + output_projection->shader << ", code:" << std::endl;
+        //std::cout << fragment_shader << std::endl;
 
         temp.texture_sampler_id = glGetUniformLocation(temp.shader.program_id, "texture_sampler");
         temp.scale_id = glGetUniformLocation(temp.shader.program_id, "scale");
         temp.rotation_matrix_id = glGetUniformLocation(temp.shader.program_id, "rotation");
         temp.zoom_id = glGetUniformLocation(temp.shader.program_id, "zoom");
+        temp.infinite_mode_id = glGetUniformLocation(temp.shader.program_id, "infinite_mode");
 
         loaded_shader = &loaded_shaders[shader_id];
         *loaded_shader = temp;
@@ -254,6 +259,12 @@ static bool update_shader() {
     }
 
     current_shader = loaded_shader;
+    if (current_shader->source->prepare_input) {
+        current_shader->source->prepare_input(get_current_map()->texture.width, get_current_map()->texture.height, current_shader->shader.program_id);
+    }
+    if (current_shader->output->prepare_output) {
+        current_shader->output->prepare_output(get_current_map()->texture.width, get_current_map()->texture.height, current_shader->shader.program_id);
+    }
     return true;
 }
 
@@ -315,8 +326,9 @@ void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods)
         // ASDF - set output projection
         else if (key == GLFW_KEY_A) { set_projection(&equirectangular); }
         else if (key == GLFW_KEY_S) { set_projection(&mollweide); }
-        else if (key == GLFW_KEY_D) { set_projection(&azimuthal); }
-        //else if (key == GLFW_KEY_F) { set_projection(&robinson); }
+        else if (key == GLFW_KEY_D) { set_projection(&hammer); }
+        else if (key == GLFW_KEY_F) { set_projection(&azimuthal); }
+        else if (key == GLFW_KEY_G) { set_projection(&robinson); }
 
         // Reset roll
         else if (key == GLFW_KEY_SPACE) {
@@ -326,6 +338,11 @@ void handle_key(GLFWwindow *window, int key, int scancode, int action, int mods)
         // Toggle locked/unlocked mode
         else if (key == GLFW_KEY_X) {
             toggle_lock();
+        }
+
+        // Easter egg to make the projeciton infinite
+        else if (key == GLFW_KEY_C) {
+            infinite_mode = !infinite_mode;
         }
         
         // Close the window
@@ -361,6 +378,7 @@ static void measure_fps() {
         last_checked = nt;
         frames_since = 0;
         worst_dt = 0;
+        sum_since_checked = 0;
     }
 }
 
@@ -474,6 +492,7 @@ int main(int argc, char** argv)
         ERR(glBindTexture(GL_TEXTURE_2D, get_current_map()->texture.texture_id);)
         ERR(glUniform1i(current_shader->texture_sampler_id, 0);)
         ERR(glUniform1f(current_shader->zoom_id, zoom);)
+        ERR(glUniform1i(current_shader->infinite_mode_id, infinite_mode);)
         ERR(render_rectangle(current_shader->rotation_matrix_id);)
 
         glfwSwapBuffers(window);

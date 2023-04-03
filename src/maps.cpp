@@ -4,6 +4,7 @@
 
 #include "images.h"
 #include "projection.h"
+#include "projections/mollweide.h"
 
 static SphereMap earth[] = {
     {
@@ -31,9 +32,9 @@ static SphereMap earth[] = {
         .texture_name = "earth5.jpg",
         .source = &azimuthal
     },
-    /*{
+    {
         .loaded = false,
-        .texture_name = "earth6.jpg",
+        .texture_name = "earth6_pow2.jpg",
         .source = &mollweide
     },
     {
@@ -41,7 +42,7 @@ static SphereMap earth[] = {
         .texture_name = "earth7.jpg",
         .source = &mollweide
     },
-    {
+    /*{
         .loaded = false,
         .texture_name = "earth8.jpg",
         .source = &robinson
@@ -81,11 +82,11 @@ static SphereMap saturn[] = {
     }
 };
 static SphereMap universe[] = {
-    /*{
+    {
         .loaded = false,
-        .texture_name = "universe1.png",
+        .texture_name = "universe1.jpg",
         .source = &mollweide
-    }*/
+    }
 };
 
 struct SphereMapPack {
@@ -102,7 +103,7 @@ static SphereMapPack map_packs[] = {
     MAP_PACK(mars),
     MAP_PACK(jupiter),
     MAP_PACK(saturn),
-    // {universe, 0}
+    MAP_PACK(universe),
 };
 static unsigned int current_map_pack;
 

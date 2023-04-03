@@ -8,18 +8,20 @@ Different projections work, but reversing the Mollweide projection (i.e. loading
 
 ### TODO:
 
-- Allow precomputing a texture to help reversing projections
-- Mollweide projection in source image
 - Robinson projection
+- Allow any image size + offset
+- Cleanup of OpenGL objects
+- Render during resize
+- Better rotation behavior (the principle should be to minimize visible rotation around the mouse)
 - WebGL version
 
 ## Controls
 
 Click and drag to move the map around. Scroll in to zoom in. Middle click to rotate around the center.
 
- - `ASD` to select between using the equirectangular, Mollweide, or Azimuthal equidistant projections.
+ - `ASDFG` to select between using the equirectangular, Mollweide, Hammer, Azimuthal equidistant, or Robinson projections.
  - `1-9` to change between one of the 9 default maps.
- - `QWERTY` to select between images of Earth, the Moon, Mars, Jupiter, or Saturn.
+ - `QWERTY` to select between images of Earth, the Moon, Mars, Jupiter, Saturn, or the heatmap of the universe.
  - `SPACE` to reorient north up and south down.
  - `X` to toggle between locked north mode.
  - `ESC` to exit.
