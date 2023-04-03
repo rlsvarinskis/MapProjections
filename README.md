@@ -1,18 +1,17 @@
 # Map projection experiment
 
-![A different projection of Earth](/screenshots/remapped.png?raw=true "A different projection of Earth")
+![A different projection of Earth](/screenshots/earth_robinson.png?raw=true "A different projection of Earth")
+
+![A different projection of Mars](/screenshots/mars_mollweide.png?raw=true "A different projection of Mars")
 
 This program allows you to reproject any map projection onto new coordinates.
 
-Different projections work, but reversing the Mollweide projection (i.e. loading it from an image) is apparently a [much harder problem](https://en.wikipedia.org/wiki/Kepler%27s_equation#Inverse_problem) than I thought at first.
-
 ### TODO:
 
-- Robinson projection
 - Allow any image size + offset
-- Cleanup of OpenGL objects
+- Cleanup of OpenGL objects and better error handling
 - Render during resize
-- Better rotation behavior (the principle should be to minimize visible rotation around the mouse)
+- Better rotation behavior (the principle should be to minimize visible rotation/distortion around the mouse)
 - WebGL version
 
 ## Controls
@@ -30,7 +29,7 @@ Click and drag to move the map around. Scroll in to zoom in. Middle click to rot
 
 This program depends on OpenGL 3.3.
 
-Make sure the executable has access to the `res/images` and `res/shaders` folders. Right now, the program is only capable of loading .jpg files from the res/images folder.
+Make sure the executable has access to the `res/images` and `res/shaders` folders. Right now, the program is only capable of loading .jpg and .png files from the res/images folder.
 
 Linux requires `libjpeg8`, `libglew2.2`, and `libglfw3` to run. To install on Ubuntu, run the following commands:
 

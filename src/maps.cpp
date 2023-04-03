@@ -5,6 +5,7 @@
 #include "images.h"
 #include "projection.h"
 #include "projections/mollweide.h"
+#include "projections/robinson.h"
 
 static SphereMap earth[] = {
     {
@@ -42,11 +43,11 @@ static SphereMap earth[] = {
         .texture_name = "earth7.jpg",
         .source = &mollweide
     },
-    /*{
+    {
         .loaded = false,
-        .texture_name = "earth8.jpg",
+        .texture_name = "earth8_pow2.jpg",
         .source = &robinson
-    }*/
+    }
 };
 static SphereMap moon[] = {
     {

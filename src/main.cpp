@@ -14,6 +14,7 @@
 
 #include "projection.h"
 #include "projections/mollweide.h"
+#include "projections/robinson.h"
 #include "mapper.h"
 #include "shaders.h"
 #include "images.h"

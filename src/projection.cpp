@@ -75,23 +75,3 @@ Projection azimuthal = {
     .free_input = nullptr,
     .free_output = nullptr
 };
-
-bool robinson_xy_to_uv(const double x, const double y, double &u, double &v) {
-    if (x * x + y * y >= 1) {
-        return false;
-    }
-    v = PI / 2 - std::sqrt(x * x + y * y) * PI;
-    u = std::atan2(x, -y);
-    return !std::isnan(u) && !std::isnan(v);
-}
-
-Projection robinson = {
-    .width = 10000,
-    .height = 2536 * 2,
-    .shader = "robinson",
-    .xy_to_uv = &robinson_xy_to_uv,
-    .prepare_input = nullptr,
-    .prepare_output = nullptr,
-    .free_input = nullptr,
-    .free_output = nullptr
-};

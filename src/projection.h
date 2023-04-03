@@ -19,6 +19,5 @@ struct Projection {
 extern Projection equirectangular;
 extern Projection hammer;
 extern Projection azimuthal;
-extern Projection robinson;
 
 #endif

@@ -20,6 +20,7 @@ add_executable(MapProjection
     src/images.cpp
     src/projection.cpp
     src/projections/mollweide.cpp
+    src/projections/robinson.cpp
     src/mapper.cpp
     src/maps.cpp
 )
