@@ -180,12 +180,14 @@ bool robinson_prepare_input_shader(const unsigned int image_width, const unsigne
 
     GLint y_id = glGetUniformLocation(shader_program, "l_to_y");
     GLint x_id = glGetUniformLocation(shader_program, "l_to_x");
-    if (y_id < 0 || x_id < 0) {
+    GLint l_id = glGetUniformLocation(shader_program, "l_offset");
+    if (y_id < 0 || x_id < 0 || l_id < 0) {
         return false;
     }
 
     glUniform1i(y_id, 4);
     glUniform1i(x_id, 5);
+    glUniform1f(l_id, 0.5f / (float) cnt);
 
     return true;
 }
@@ -213,12 +215,14 @@ bool robinson_prepare_output_shader(const unsigned int screen_width, const unsig
 
     GLint y_id = glGetUniformLocation(shader_program, "y_to_l");
     GLint x_id = glGetUniformLocation(shader_program, "yl_to_x");
-    if (y_id < 0 || x_id < 0) {
+    GLint l_id = glGetUniformLocation(shader_program, "xy_offset");
+    if (y_id < 0 || x_id < 0 || l_id < 0) {
         return false;
     }
 
     glUniform1i(y_id, 8);
     glUniform1i(x_id, 9);
+    glUniform1f(l_id, 0.5f / (float) cnt);
 
     return true;
 }

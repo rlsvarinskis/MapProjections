@@ -32,7 +32,7 @@ static bool textures_prepared = false;
  * This probably overcomplicates the code without too much benefit, but hopefully it makes
  * the projection more precise.
  */
-static const int cnt_000 = 2048;
+static const int cnt_000 = /*2048*/512;
 static const int cnt_300 = 4096;
 static const int cnt_314 = 8192;
 static const int cnt = cnt_000 - 1 + cnt_300 - 1 + cnt_314;
@@ -157,14 +157,21 @@ bool mollweide_prepare_input_shader(const unsigned int image_width, const unsign
     GLint t000_id = glGetUniformLocation(shader_program, "texture_000_300");
     GLint t300_id = glGetUniformLocation(shader_program, "texture_300_314");
     GLint t314_id = glGetUniformLocation(shader_program, "texture_314_pi");
+    GLint t000_o_id = glGetUniformLocation(shader_program, "t000_offset");
+    GLint t300_o_id = glGetUniformLocation(shader_program, "t300_offset");
+    GLint t314_o_id = glGetUniformLocation(shader_program, "t314_offset");
 
-    if (t000_id < 0 || t300_id < 0 || t314_id < 0) {
+    if (t000_id < 0 || t300_id < 0 || t314_id < 0 || t000_o_id < 0 || t300_o_id < 0 || t314_o_id < 0) {
         return false;
     }
 
     glUniform1i(t000_id, 4);
     glUniform1i(t300_id, 5);
     glUniform1i(t314_id, 6);
+
+    glUniform1f(t000_o_id, 0.5f / (float) cnt_000);
+    glUniform1f(t300_o_id, 0.5f / (float) cnt_300);
+    glUniform1f(t314_o_id, 0.5f / (float) cnt_314);
 
     return true;
 }
