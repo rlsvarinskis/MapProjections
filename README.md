@@ -1,33 +1,35 @@
 # Map projection experiment
 
-![A different projection of Earth](/screenshots/remapped.png?raw=true "A different projection of Earth")
+![A different projection of Earth](/screenshots/earth_robinson.png?raw=true "A different projection of Earth")
+
+![A different projection of Mars](/screenshots/mars_mollweide.png?raw=true "A different projection of Mars")
 
 This program allows you to reproject any map projection onto new coordinates.
 
-Currently, it only supports the equirectangular projection.
-
 ### TODO:
 
-- Mollweide projection
-- Azimuthal equidistant projection
-- Robinson projection
-- Ability load one projection and render it as another
+- Allow any image size + offset
+- Cleanup of OpenGL objects and better error handling
+- Render during resize
+- Better rotation behavior (the principle should be to minimize visible rotation/distortion around the mouse)
 - WebGL version
 
 ## Controls
 
 Click and drag to move the map around. Scroll in to zoom in. Middle click to rotate around the center.
 
+ - `ASDFG` to select between using the equirectangular, Mollweide, Hammer, Azimuthal equidistant, or Robinson projections.
+ - `1-9` to change between one of the 9 default maps.
+ - `QWERTY` to select between images of Earth, the Moon, Mars, Jupiter, Saturn, or the heatmap of the universe.
  - `SPACE` to reorient north up and south down.
  - `X` to toggle between locked north mode.
- - `1-9` to change between one of the 9 default maps.
  - `ESC` to exit.
 
 ## Dependencies
 
 This program depends on OpenGL 3.3.
 
-Make sure the executable has access to the `res/images` and `res/shaders` folders. Right now, the program is only capable of loading .jpg files from the res/images folder.
+Make sure the executable has access to the `res/images` and `res/shaders` folders. Right now, the program is only capable of loading .jpg and .png files from the res/images folder.
 
 Linux requires `libjpeg8`, `libglew2.2`, and `libglfw3` to run. To install on Ubuntu, run the following commands:
 

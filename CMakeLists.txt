@@ -19,7 +19,10 @@ add_executable(MapProjection
     src/shaders.cpp
     src/images.cpp
     src/projection.cpp
+    src/projections/mollweide.cpp
+    src/projections/robinson.cpp
     src/mapper.cpp
+    src/maps.cpp
 )
 
 target_include_directories(MapProjection
