@@ -7,6 +7,7 @@ in vec2 UV;
 out vec3 color;
 
 uniform vec2 scale;
+uniform vec2 uv_scale;
 uniform float zoom;
 uniform sampler2D texture_sampler;
 uniform mat3 rotation;
@@ -42,5 +43,5 @@ void main() {
 
     uv.y = 1 - uv.y;
 
-    color = texture(texture_sampler, uv).rgb;
+    color = texture(texture_sampler, uv * uv_scale).rgb;
 }

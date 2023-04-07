@@ -168,6 +168,7 @@ struct LoadedShader {
     GLuint texture_sampler_id;
     GLuint zoom_id;
     GLuint scale_id;
+    GLuint uv_scale_id;
     GLuint rotation_matrix_id;
     GLuint infinite_mode_id;
 };
@@ -249,6 +250,7 @@ static bool update_shader() {
 
         temp.texture_sampler_id = glGetUniformLocation(temp.shader.program_id, "texture_sampler");
         temp.scale_id = glGetUniformLocation(temp.shader.program_id, "scale");
+        temp.uv_scale_id = glGetUniformLocation(temp.shader.program_id, "uv_scale");
         temp.rotation_matrix_id = glGetUniformLocation(temp.shader.program_id, "rotation");
         temp.zoom_id = glGetUniformLocation(temp.shader.program_id, "zoom");
         temp.infinite_mode_id = glGetUniformLocation(temp.shader.program_id, "infinite_mode");
@@ -266,6 +268,8 @@ static bool update_shader() {
     if (current_shader->output->prepare_output) {
         current_shader->output->prepare_output(get_current_map()->texture.width, get_current_map()->texture.height, current_shader->shader.program_id);
     }
+    glUseProgram(current_shader->shader.program_id);
+    glUniform2f(current_shader->uv_scale_id, get_current_map()->texture.sx, get_current_map()->texture.sy);
     return true;
 }
 
@@ -290,9 +294,14 @@ static void select_map(unsigned int id) {
     }
     if (!set_map_pack(0)) {
         std::cerr << "Failed to reset map pack to 0" << std::endl;
+        return;
     }
     if (!set_map(0)) {
         std::cerr << "Failed to reset map to 0" << std::endl;
+        return;
+    }
+    if (update_shader()) {
+        return;
     }
 }
 
@@ -306,6 +315,10 @@ static void select_pack(unsigned int id) {
     }
     if (!set_map_pack(0)) {
         std::cerr << "Failed to reset map pack to 0" << std::endl;
+        return;
+    }
+    if (update_shader()) {
+        return;
     }
 }
 
