@@ -8,7 +8,6 @@ This program allows you to reproject any map projection onto new coordinates.
 
 ### TODO:
 
-- Allow any image size + offset
 - Cleanup of OpenGL objects and better error handling
 - Render during resize
 - Better rotation behavior (the principle should be to minimize visible rotation/distortion around the mouse)
