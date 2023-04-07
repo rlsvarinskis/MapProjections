@@ -11,6 +11,10 @@ struct SphereMap {
     std::string texture_name;
     Texture texture;
     Projection *source;
+    int x;
+    int y;
+    int w;
+    int h;
 };
 
 bool set_map(unsigned int id);

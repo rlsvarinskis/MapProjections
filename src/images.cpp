@@ -103,10 +103,13 @@ static bool load_png(const std::string &filename, struct Image &image) {
         png_set_packing(png_ptr);
     }
     image.channels = png_get_channels(png_ptr, info_ptr);
-
     if (color_type == PNG_COLOR_TYPE_PALETTE) {
-        std::cerr << "PNG color palettes are unsupported" << std::endl;
-        goto error_png;
+        png_set_palette_to_rgb(png_ptr);
+        image.channels = 3;
+    }
+    if (png_get_valid(png_ptr, info_ptr, PNG_INFO_tRNS) != 0) {
+        png_set_tRNS_to_alpha(png_ptr);
+        image.channels++;
     }
 
     int x, y;
@@ -180,13 +183,66 @@ void free_image(struct Image &image) {
     delete[] image.data;
 }
 
-bool load_texture(const std::string &name, struct Texture &texture) {
+static inline bool is_pow2(unsigned int x) {
+    return (x & (x - 1)) == 0;
+}
+
+static inline unsigned int get_pow2(unsigned int x) {
+    if (is_pow2(x)) {
+        return x;
+    }
+    while (!is_pow2(x)) {
+        x &= ~(x ^ (x - 1));
+    }
+    return x * 2;
+}
+
+bool load_texture(const std::string &name, struct Texture &texture, unsigned int x, unsigned int y, int w, int h) {
     std::string filename = "./res/images/" + name;
 
     struct Image image;
     if (!load_image(filename, image)) {
         std::cerr << "Failed to load texture: " << name << std::endl;
         return false;
+    }
+
+    // If the texture needs to be cropped, or its size is not a power of 2
+    if (x != 0 || y != 0 || (w != 0 && w != image.width) || (h != 0 && h != image.height) || !is_pow2(image.width) || !is_pow2(image.height)) {
+        if (w <= 0) {
+            w = image.width + w - x;
+        }
+        if (h <= 0) {
+            h = image.height + h - y;
+        }
+        unsigned int nw = get_pow2(w);
+        unsigned int nh = get_pow2(h);
+        unsigned char* cropped_data = new unsigned char[nw * nh * image.channels];
+        for (int i = 0; i < nw * nh * image.channels; i++) {
+            cropped_data[i] = 0xFF;
+        }
+
+        unsigned int original_i = (y * image.width + x) * image.channels;
+        unsigned int original_skip = (image.width - w) * image.channels;
+        unsigned int destination_i = 0;
+        unsigned int destination_skip = (nw - w) * image.channels;
+
+        for (int i = 0; i < h; i++) {
+            for (int j = 0; j < w * image.channels; j++) {
+                cropped_data[destination_i++] = image.data[original_i++];
+            }
+            original_i += original_skip;
+            destination_i += destination_skip;
+        }
+        texture.sx = (float) w / (float) nw;
+        texture.sy = (float) h / (float) nh;
+
+        delete[] image.data;
+        image.data = cropped_data;
+        image.width = nw;
+        image.height = nh;
+    } else {
+        texture.sx = 1;
+        texture.sy = 1;
     }
 
     texture.width = image.width;

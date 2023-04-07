@@ -14,12 +14,13 @@ struct Image {
 struct Texture {
     GLuint texture_id;
     unsigned int width, height;
+    float sx, sy;
 };
 
 bool load_image(const std::string &name, struct Image &image);
 void free_image(struct Image &image);
 
-bool load_texture(const std::string &name, struct Texture &texture);
+bool load_texture(const std::string &name, struct Texture &texture, unsigned int x = 0, unsigned int y = 0, int w = 0, int h = 0);
 void free_texture(struct Texture &texture);
 
 #endif

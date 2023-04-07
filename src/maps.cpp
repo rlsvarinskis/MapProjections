@@ -7,26 +7,33 @@
 #include "projections/mollweide.h"
 #include "projections/robinson.h"
 
+#define CROP(a, b, c, d) .x = a, .y = b, .w = c, .h = d
+#define NO_CROP CROP(0, 0, 0, 0)
+
 static SphereMap earth[] = {
     {
         .loaded = false,
         .texture_name = "earth1.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     },
     {
         .loaded = false,
         .texture_name = "earth2.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     },
     {
         .loaded = false,
         .texture_name = "earth3.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     },
     {
         .loaded = false,
         .texture_name = "earth4.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     },
     {
         .loaded = false,
@@ -35,58 +42,67 @@ static SphereMap earth[] = {
     },
     {
         .loaded = false,
-        .texture_name = "earth6_pow2.jpg",
-        .source = &mollweide
+        .texture_name = "earth6.jpg",
+        .source = &mollweide,
+        CROP(6, 7, -6, -7)
     },
     {
         .loaded = false,
-        .texture_name = "earth7.jpg",
-        .source = &mollweide
+        .texture_name = "earth7.png",
+        .source = &mollweide,
+        CROP(16, 18, 1579, 787)
     },
     {
         .loaded = false,
-        .texture_name = "earth8_pow2.jpg",
-        .source = &robinson
+        .texture_name = "earth8.jpg",
+        .source = &robinson,
+        CROP(1, 1, -1, -1)
     }
 };
 static SphereMap moon[] = {
     {
         .loaded = false,
         .texture_name = "moon1.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     }
 };
 static SphereMap mars[] = {
     {
         .loaded = false,
         .texture_name = "mars1.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     },
     {
         .loaded = false,
         .texture_name = "mars2.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     }
 };
 static SphereMap jupiter[] = {
     {
         .loaded = false,
         .texture_name = "jupiter1.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     }
 };
 static SphereMap saturn[] = {
     {
         .loaded = false,
         .texture_name = "saturn1.jpg",
-        .source = &equirectangular
+        .source = &equirectangular,
+        NO_CROP
     }
 };
 static SphereMap universe[] = {
     {
         .loaded = false,
-        .texture_name = "universe1.jpg",
-        .source = &mollweide
+        .texture_name = "universe1.png",
+        .source = &mollweide,
+        NO_CROP
     }
 };
 
@@ -114,7 +130,7 @@ static bool set_map(unsigned int pack, unsigned int id) {
     }
     SphereMap &sm = map_packs[pack].maps[id];
     if (!sm.loaded) {
-        if (!(sm.loaded = load_texture(sm.texture_name, sm.texture))) {
+        if (!(sm.loaded = load_texture(sm.texture_name, sm.texture, sm.x, sm.y, sm.w, sm.h))) {
             return false;
         }
     }
